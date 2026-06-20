@@ -1,0 +1,20 @@
+## Interface: 120007
+## Title: |cff00c7ffVRT|r |cffff8040Reader|r (Sessions)
+## Notes: Required companion to VoidRaidTools. Captures boss cast events + friendly auras during raid encounters and uploads (with your consent) to api.voidscout.io. First-run dialog explains exactly what's collected; /vrtr optout to keep recordings local-only.
+## Author: Vede
+## Version: 1.0.4
+## DefaultState: enabled
+## SavedVariables: VoidRaidToolsReaderDB, VoidHubCharDB
+## SavedVariablesPerCharacter: VoidRaidToolsReaderCharDB
+## IconTexture: Interface\Icons\Spell_Shadow_EvilEye
+
+# Consent dialog must load BEFORE SessionRecorder so the predicate
+# VRTReader_IsUploadAllowed() is defined when queueForUpload checks it.
+ConsentDialog.lua
+Core.lua
+IdentityProbes.lua
+SessionRecorder.lua
+
+# Minimap button + shared VoidHub icon cluster.
+Minimap.lua
+VoidHubBundle.lua
