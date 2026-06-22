@@ -606,7 +606,6 @@ local function OnEvent(_, event, ...)
             end
         end
         if drained > 0 then
-            print(("|cff00c7ff[VRT-R Sessions]|r backfilled %d stored session(s) to upload queue."):format(drained))
         end
     end
 end
