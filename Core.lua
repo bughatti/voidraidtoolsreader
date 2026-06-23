@@ -1823,7 +1823,6 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
             Send("SV_LAUNDER", probeSavedVarsLaunder())
         end)
         -- Silent boot — single line indicator only.
-        print("|cffff8040[VRT-R]|r poly detector armed.")
         return
     end
     raw_event_count = raw_event_count + 1
