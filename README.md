@@ -58,8 +58,3 @@ If you bump the consent dialog's `CONSENT_VERSION` (e.g. when adding a new data 
 - `/vrtsr clear-queue` — wipe the pending queue (sessions remain in `db.sessions` for inspection)
 
 The full payload of any session sits in `VoidRaidToolsReaderDB.blackbox.sessions` — open `VoidRaidToolsReader.lua` after a `/reload` and you can read every field with any text editor.
-
-## Source of truth
-
-This repo is the source. The deployed copy at
-`Interface/AddOns/VoidRaidToolsReader/` is a sync target. Edit the source, sync to the install dir, then `/reload`.
