@@ -1,6 +1,6 @@
 # VoidRaidToolsReader
 
-Required companion to **VoidRaidTools**. Captures boss cast events and party aura traces during raid encounters so the alert engine and Probability Score model can learn what really fires in 12.0.5 Midnight content.
+Required companion to **VoidRaidTools**. Captures boss cast events and party aura traces during raid encounters so the alert engine and Probability Score model can learn what really fires in 12.0.7 Midnight content.
 
 ## What gets uploaded
 
@@ -21,6 +21,16 @@ Each completed raid encounter session is queued for upload to `api.voidscout.io`
 - Other addons' SavedVariables
 - Anything from protected APIs or memory
 - Player keystrokes, system info, hardware fingerprints
+
+## The companion uploader (optional)
+
+Uploading uses a small **separate companion app** — **[voidscout-uploader](https://github.com/bughatti/voidscout-uploader)**
+(open-source, MIT, a single ~7 MB binary, no install dependencies), **shared with VoidScout**. WoW
+addons can't make web requests, so this app is what actually drains the queue to `api.voidscout.io`.
+
+- **Optional.** VoidRaidTools + Reader work fully without it (alerts + offline `/vrtsr` review); the
+  uploader just contributes your captured sessions to the shared model.
+- **Get it:** **https://voidscout.io/install** (or the [GitHub Releases](https://github.com/bughatti/voidscout-uploader/releases/latest)). One app covers both VoidScout and VoidRaidToolsReader — install it once.
 
 ## TOS posture
 

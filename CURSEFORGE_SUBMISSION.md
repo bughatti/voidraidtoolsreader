@@ -46,6 +46,14 @@ On first `PLAYER_LOGIN` after install you'll see a one-time dialog explaining wh
 
 Toggle anytime with `/vrtr` (status), `/vrtr optout`, `/vrtr optin`.
 
+## The companion uploader (optional)
+
+Uploading uses a small **separate companion app** — **voidscout-uploader** (open-source/MIT, a single
+~7 MB binary, no install dependencies), **shared with VoidScout**. WoW addons can't make web requests,
+so this app is what drains the queue to api.voidscout.io. Optional — the Reader works fully without it
+(offline `/vrtsr` review). **Get it at https://voidscout.io/install** (or GitHub Releases:
+github.com/bughatti/voidscout-uploader). One app covers both VoidScout and VoidRaidToolsReader.
+
 ## TOS posture
 
 Every API used is in Blizzard's documented addon surface. Data shape is identical to what Warcraft Logs, Archon, and WoWAnalyzer upload — we're not in different legal territory than those tools, the only difference is we run the server.
