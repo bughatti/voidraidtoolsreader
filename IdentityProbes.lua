@@ -197,6 +197,7 @@ local function probeModelDeferred(unit, entry)
     -- Reset the model state and assign the unit. The HOLDER parent is
     -- Hide()'d so even if the model briefly renders, nothing shows.
     m:ClearModel()
+    m._probe_owner = entry  -- shared model: newest probe owns it
     local ok_set = pcall(m.SetUnit, m, unit)
     entry.model = entry.model or {}
     entry.model.set_unit_ok = ok_set
@@ -212,6 +213,9 @@ local function probeModelDeferred(unit, entry)
     -- Re-read after 0.6s, by which time the engine has loaded the model.
     if C_Timer and C_Timer.After then
         C_Timer.After(0.6, function()
+            -- A newer probe re-pointed the model at another unit; reading it
+            -- now would file that unit's model under this entry.
+            if m._probe_owner ~= entry then return end
             local ok_id, id = pcall(m.GetDisplayInfo, m)
             local ok_fid, fid = pcall(m.GetModelFileID, m)
             entry.model.deferred = {

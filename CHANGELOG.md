@@ -1,5 +1,36 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.10] — 2026-10-15
+
+### Changed
+- **Records less.** In the open world it now records only fights with **rares and world bosses** (it used to record every fight anywhere). Raids, dungeons and delves are unchanged.
+- Turned off old research logging that recorded game events, system messages and every played sound into your saved data — none of it was used. Your saved file gets smaller.
+- The privacy section now spells out exactly when it records.
+
+## [1.0.9] — 2026-10-14
+
+### Changed
+- Updated for WoW 12.1.5 — no longer shows as out of date.
+
+## [1.0.8] — 2026-10-06
+
+### Changed
+- The Void addons info panel (`/vhub info`) now lists only the addons you can actually get, with up-to-date descriptions.
+
+## [1.0.7] — 2026-08-11
+
+### Fixed
+- **Patch 12.1 taint crashes:** the `UNIT_AURA` handler threw secret-value errors
+  in instances — first a boolean test on secret `isFullUpdate`
+  (`SessionRecorder.lua:562`), then `ipairs` on the now-secret `addedAuras` table
+  (`:577`). All secret-prone aura data (`isFullUpdate`, the `addedAuras` list, and
+  per-aura `isHarmful`/`spellId`) is now guarded with `issecretvalue`; the raw
+  UNIT_AURA capture path is skipped when the payload is secret (instanced aura
+  data still comes from the periodic probe / ETEA), so no more Lua error spam.
+
+### Changed
+- Compatibility with patch 12.1 "Curse of Ula'tek" (TOC interface bump to 12.1).
+
 ## 1.0.6 — 2026-06-22
 
 ### Changed

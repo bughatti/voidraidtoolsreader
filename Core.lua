@@ -797,9 +797,9 @@ local function snapshot(unit)
                 .. "^color=" .. probeBarColor(cb))
         end
     end)
-    pcall(function()
-        Send("TOOLTIP", unit .. "^" .. probeTooltipScrape(unit))
-    end)
+    -- TOOLTIP probe removed from the live path: it took over the shared
+    -- GameTooltip and hid it on every hostile cast (dismissing whatever the
+    -- player was reading), and Send() is a no-op so the result went nowhere.
     pcall(function()
         Send("AURA1", "player^" .. probePlayerAuraSlot1())
     end)
@@ -1013,6 +1013,8 @@ local function onNameplateCast(unit)
         end
     end)
     cancelDetectorTimer(unit)
+    -- Friendly nameplates cast too; only a hostile cast can be the Polymorph.
+    if not UnitCanAttack("player", unit) then return end
     local start_ts = GetTime()
     local entry = { start_ts = start_ts }
     active_casts[unit] = entry
@@ -1097,6 +1099,16 @@ end
 frame:RegisterEvent("ADDON_LOADED")
 
 ----------------------------------------------------------------------
+-- RESEARCH PROBES (off). The kitchen-sink event log, the sound-capture
+-- hooks and the EXBoss/Exwind global walk below were Polymorph-detection
+-- research. Left on, they logged ~60 events (incl. system chat text) and
+-- every played sound for every player, ~1.6 MB of SavedVariables, and read
+-- another addon's data — none of it used by VRT, and contrary to the
+-- README's "never recorded" list. Flip to true only for a research build.
+----------------------------------------------------------------------
+local RESEARCH_PROBES = false
+
+----------------------------------------------------------------------
 -- KITCHEN-SINK EVENT PROBE
 --   Register every event we can think of. Log timestamps for later
 --   correlation against Polymorph cast times. If any event fires near
@@ -1128,8 +1140,10 @@ local SINK_EVENTS = {
     "ACTIONBAR_UPDATE_STATE",
 }
 local sink_frame = CreateFrame("Frame", "VRT_Reader_SinkEventFrame")
-for _, ev in ipairs(SINK_EVENTS) do
-    pcall(sink_frame.RegisterEvent, sink_frame, ev)
+if RESEARCH_PROBES then
+    for _, ev in ipairs(SINK_EVENTS) do
+        pcall(sink_frame.RegisterEvent, sink_frame, ev)
+    end
 end
 sink_frame:SetScript("OnEvent", function(_, ev, a1, a2, a3)
     local d = getDB()
@@ -1173,12 +1187,12 @@ local function recordSound(label, soundID, channel)
     _capLog(d.sound_log, 5000)
 end
 
-if _G.PlaySoundFile then
+if RESEARCH_PROBES and _G.PlaySoundFile then
     pcall(hooksecurefunc, "PlaySoundFile", function(sound, channel)
         recordSound("File", sound, channel)
     end)
 end
-if _G.PlaySound then
+if RESEARCH_PROBES and _G.PlaySound then
     pcall(hooksecurefunc, "PlaySound", function(soundKitID, channel, forceNoDuplicates, runFinishCallback)
         recordSound("Kit", soundKitID, channel)
     end)
@@ -1197,11 +1211,18 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     end
     if event == "PLAYER_LOGIN" then
         registerHostileUnitEvents()
+        if not RESEARCH_PROBES then
+            -- drop what the research probes saved before they were switched off
+            local db = getDB()
+            db.sink_log, db.sound_log = nil, nil
+            db.exboss_probe, db.exboss_deep, db.exboss_deep_sentinel = nil, nil, nil
+        end
         -- EXBOSS DATA PROBE: walk EXBoss/Exwind/EXBossData globals to
         -- discover what's exposed. Dump shape + sample of every table
         -- so we can decide which to consume for VRT trash detection.
         -- Delayed by 3s to let dependent addons fully initialize.
         C_Timer.After(3, function()
+            if not RESEARCH_PROBES then return end
             local d = getDB()
             d.exboss_probe = d.exboss_probe or {}
             local results = {}

@@ -80,7 +80,7 @@ local function BuildDialog()
     )
 
     -- Uploader requirement callout — the box that explains the gotcha that
-    -- bit Vede's raid mates: clicking "Allow uploads" only flips the addon
+    -- bit the author's raid mates: clicking "Allow uploads" only flips the addon
     -- flag, it does NOT install a network daemon. Without the Go uploader
     -- running, sessions just pile up locally and never reach the server.
     local up_title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -209,8 +209,10 @@ SlashCmdList["VRTR"] = function(arg)
         print("|cff00c7ff[VRT Reader]|r currently: |cffffaa20LOCAL-ONLY|r. To allow uploads, |cffffd700/vrtr optin|r.")
     else
         print("|cff00c7ff[VRT Reader]|r no consent choice on file. Opening dialog...")
-        ShowDialog()
     end
+    -- Always (re)open: after a first choice this is the only route to
+    -- "Delete + go local", and the minimap left-click lands here too.
+    ShowDialog()
 end
 
 local f = CreateFrame("Frame", "VRTReader_ConsentLoginFrame")
