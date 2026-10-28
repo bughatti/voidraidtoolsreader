@@ -1,60 +1,77 @@
 # VoidRaidToolsReader
 
-Required companion to **VoidRaidTools**. Captures boss cast events and party aura traces during raid encounters so the alert engine and Probability Score model can learn what really fires in 12.0.7 Midnight content.
+**The required companion to VoidRaidTools — records boss events so its alerts know what really happens in each fight.**
 
-## What gets uploaded
+VoidRaidToolsReader quietly records boss and enemy casts and party buff/debuff traces during fights in raids and dungeons. VoidRaidTools uses that data to fire the right alerts, and — only if you allow it — your sessions help the shared model learn what each boss actually does in Midnight content.
 
-Each completed raid encounter session is queued for upload to `api.voidscout.io`:
+---
 
-- **Boss cast events** — `ENCOUNTER_TIMELINE_EVENT_ADDED` payloads + the clean spell ID resolved via `C_EncounterEvents.GetEventInfo`. Names are looked up at the server, not sent.
-- **Group roster** — your party/raid members' names, realms, classes, specs, roles as your client renders them in the party frame.
-- **Friendly aura traces** — `UNIT_AURA` fires on player + party/raid tokens during the encounter window only.
-- **Encounter metadata** — encounter ID, difficulty (Normal/Heroic/Mythic), group size, kill/wipe outcome, start/end timestamp.
-- **Marker updates** — count of raid-target-icon changes during the pull (not the markers themselves).
-- **Your own position** — periodic `C_Map.GetPlayerMapPosition("player")` reads. Self-only; we do not read other players' positions.
+## Features
 
-## What does NOT get uploaded
+- **Fight recording** — boss and enemy cast events with clean spell IDs, captured only during fights in raids, dungeons and delves, and against rares and world bosses in the open world
+- **Your choice of mode** — allow uploads, or keep everything local-only; switch anytime
+- **See exactly what's stored** — list recent sessions and the upload queue in game, or read the saved file in any text editor
+- **Lightweight** — records only those fights; nothing in cities, queues, or ordinary open-world combat
 
-- Anything outside an active encounter (no city/world/AH/queue chatter)
-- Chat or whisper content
-- Your gear, inventory, currency, achievements, bank
-- Other addons' SavedVariables
-- Anything from protected APIs or memory
-- Player keystrokes, system info, hardware fingerprints
+---
 
-## The companion uploader (optional)
+## Slash Commands
 
-Uploading uses a small **separate companion app** — **[voidscout-uploader](https://github.com/bughatti/voidscout-uploader)**
-(open-source, MIT, a single ~7 MB binary, no install dependencies), **shared with VoidScout**. WoW
-addons can't make web requests, so this app is what actually drains the queue to `api.voidscout.io`.
+| Command | What it does |
+|---|---|
+| `/vrtr` | Show your current upload choice (opens the consent dialog if you haven't chosen) |
+| `/vrtr optout` | Switch to local-only (also `/vrtr local`) |
+| `/vrtr optin` | Allow uploads (also `/vrtr allow`) |
+| `/vrtsr` | List recent recorded sessions |
+| `/vrtsr queue` | Show sessions waiting to upload |
+| `/vrtsr clear-queue` | Empty the upload queue (sessions stay saved locally) |
 
-- **Optional.** VoidRaidTools + Reader work fully without it (alerts + offline `/vrtsr` review); the
-  uploader just contributes your captured sessions to the shared model.
-- **Get it:** **https://voidscout.io/install** (or the [GitHub Releases](https://github.com/bughatti/voidscout-uploader/releases/latest)). One app covers both VoidScout and VoidRaidToolsReader — install it once.
+---
 
-## TOS posture
+## Getting Started
 
-Every API used is in Blizzard's documented addon surface. The data shape is identical to what Warcraft Logs, Archon, WoWAnalyzer, and Details upload — the only difference is we run the server ourselves. We don't bypass anti-cheat, we don't write to SecureActionButton in a way that's restricted, we don't read other players' positions.
+1. Install **VoidRaidToolsReader** and **VoidRaidTools** with the CurseForge app (or copy both folders into `World of Warcraft/_retail_/Interface/AddOns/`).
+2. Restart WoW or `/reload`.
+3. On first login, choose **Allow uploads** or **Local-only** in the consent dialog.
 
-## Consent model
+---
 
-On first `PLAYER_LOGIN` after install you'll see a dialog with two buttons:
+## Privacy & Data
 
-- **Allow uploads** — Reader queues sessions to `pending_uploads` and the Go uploader drains it to the server.
-- **Local-only (no upload)** — Reader still records to `VoidRaidToolsReaderDB` for offline `/vrtsr` review, but never queues for upload.
+### When it records
+- **Raids, dungeons and delves** — boss encounters, Mythic+ runs and trash fights
+- **Open world** — only fights with a **rare** or **world boss**
 
-You can flip the choice anytime:
+### What's recorded during a fight
+- **Boss and enemy cast events** and their spell IDs (spell names are looked up on the server, not sent)
+- **Your group roster** — names, realms, classes, specs, and roles, as shown in your party frames
+- **Buff/debuff traces** on you and your group, during the fight only
+- **Fight details** — boss or zone, difficulty, group size, kill or wipe, start and end time
+- **How many times raid markers changed** (not the markers themselves)
+- **Your own position** — never anyone else's
 
-- `/vrtr` — show current state, open dialog if not yet decided
-- `/vrtr optout` (or `/vrtr local`) — disable uploads
-- `/vrtr optin` (or `/vrtr allow`) — enable uploads
+### What's never recorded
+- Anything outside those fights — including ordinary open-world combat
+- Chat or whispers
+- Your gear, bags, currency, achievements, or bank
+- Other addons' data, protected game data, keystrokes, or system/hardware info
 
-If you bump the consent dialog's `CONSENT_VERSION` (e.g. when adding a new data category), the prompt re-fires on next login.
+### Uploading (optional)
+WoW addons can't make web requests, so uploads go through a small separate app, **voidscout-uploader** — open source (MIT), a single ~7 MB file, nothing else to install. The same app serves VoidScout, so you only install it once.
 
-## Inspecting what would be uploaded
+- **Optional** — VoidRaidTools and the Reader work fully without it
+- **Get it:** [voidscout.io/install](https://voidscout.io/install) or the [GitHub releases page](https://github.com/bughatti/voidscout-uploader/releases/latest)
 
-- `/vrtsr` — list of recent stored sessions (encounter name, difficulty, event counts)
-- `/vrtsr queue` — the `pending_uploads` queue (what the Go uploader is about to drain)
-- `/vrtsr clear-queue` — wipe the pending queue (sessions remain in `db.sessions` for inspection)
+### Playing by the rules
+Every API used is part of Blizzard's documented addon interface. The data is the same kind Warcraft Logs, Archon, WoWAnalyzer, and Details upload — we just run our own server. No anti-cheat bypassing, no restricted actions, and no reading other players' positions.
 
-The full payload of any session sits in `VoidRaidToolsReaderDB.blackbox.sessions` — open `VoidRaidToolsReader.lua` after a `/reload` and you can read every field with any text editor.
+---
+
+## Compatibility
+
+- **WoW 12.1.5** (Midnight Season 2)
+- Install together with **VoidRaidTools**
+
+---
+
+*Part of the Void addon family by Vede · MIT licensed · free M+ & raid player lookups at [voidscout.io](https://voidscout.io) · more addons & apps at [tinkerline.io](https://tinkerline.io) · [Discord](https://discord.gg/7ZHmx7zMDh)*

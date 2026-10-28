@@ -14,7 +14,9 @@
 --
 -- Captures (all keyed under VoidRaidToolsReaderDB.sessions):
 --   - Session boundaries: ENCOUNTER_START/END, CHALLENGE_MODE_*,
---     PLAYER_REGEN_DISABLED/ENABLED fallback for trash combats
+--     PLAYER_REGEN_DISABLED/ENABLED fallback for trash combats — inside
+--     instances only; in the open world just rares/world bosses
+--     (maybeStartCombatSession)
 --   - Position + map + zone + subzone at session start
 --   - Group composition snapshot (class/spec/role) at session start
 --   - ETEA boss events with CLEAN spell IDs via C_EncounterEvents
@@ -143,10 +145,19 @@ local function snapshotPosition()
     }
 end
 
+local REGION_SLUG = { [1] = "us", [2] = "kr", [3] = "eu", [4] = "tw", [5] = "cn" }
+
 local function snapshotGroup()
     local group = { player = {} }
     local _, plr_class = UnitClass("player")
     group.player.class = plr_class
+    -- Character IDENTITY so the session can be attributed to the RIGHT char. Without this
+    -- the uploader falls back to a stale "most-fights" global contributor and mislabels
+    -- alts whose content produced no scored fights (e.g. follower dungeons).
+    group.player.name = UnitName("player")
+    group.player.realm = (GetNormalizedRealmName and GetNormalizedRealmName())
+        or (GetRealmName and GetRealmName()) or nil
+    group.player.region = REGION_SLUG[(GetCurrentRegion and GetCurrentRegion()) or 1] or "us"
     if GetSpecialization then
         local idx = GetSpecialization()
         if idx then
@@ -236,8 +247,13 @@ end
 ----------------------------------------------------------------------
 -- Session lifecycle
 ----------------------------------------------------------------------
+local endSession  -- forward-declared; defined below queueForUpload
+
 local function startSession(label, info)
-    if current_session then current_session.end_ts = time() end
+    -- Close + queue the session being replaced (e.g. a boss pulled during a
+    -- trash-combat session). Setting only end_ts stranded it with no end_gt,
+    -- so it backfilled later at duration 0 and the combat filter dropped it.
+    if current_session then endSession(nil) end
     local db = getDB()
     current_session = {
         label      = label,
@@ -400,7 +416,7 @@ local function queueForUpload(s)
     dropOldest(q, MAX_PENDING_UPLOADS, 0.20)
 end
 
-local function endSession(success)
+function endSession(success)
     if not current_session then return end
     current_session.end_ts  = time()
     current_session.end_gt  = GetTime()
@@ -435,6 +451,44 @@ local function periodicProbe()
 end
 
 ----------------------------------------------------------------------
+-- Open world: record only fights with rares and world bosses (founder
+-- 2026-10-14: "i dont care about open world except for rares and world
+-- bosses"). Inside instances (dungeons, raids, delves, scenarios) every
+-- combat still records, trash included. World bosses that fire
+-- ENCOUNTER_START are covered by the encounter path too.
+----------------------------------------------------------------------
+local OPEN_WORLD_KEEP = { rare = true, rareelite = true, worldboss = true }
+
+local function inOpenWorld()
+    local inInstance, instanceType = IsInInstance()
+    return not inInstance or instanceType == "none"
+end
+
+-- "rare" / "rareelite" / "worldboss" if target or focus is one, else nil.
+local function worthyClassification()
+    for _, unit in ipairs({ "target", "focus" }) do
+        if UnitExists(unit) then
+            local c = UnitClassification(unit)
+            if c and not (issecretvalue and issecretvalue(c)) and OPEN_WORLD_KEEP[c] then
+                return c
+            end
+        end
+    end
+end
+
+-- Start a "combat" session if this fight qualifies (always in instances;
+-- in the open world only against a rare / world boss).
+local function maybeStartCombatSession()
+    if current_session then return end
+    if not inOpenWorld() then
+        startSession("combat", {})
+        return
+    end
+    local c = worthyClassification()
+    if c then startSession("combat", { open_world = true, classification = c }) end
+end
+
+----------------------------------------------------------------------
 -- Event handler
 ----------------------------------------------------------------------
 local function OnEvent(_, event, ...)
@@ -462,7 +516,11 @@ local function OnEvent(_, event, ...)
         endSession(true)
 
     elseif event == "PLAYER_REGEN_DISABLED" then
-        if not current_session then startSession("combat", {}) end
+        maybeStartCombatSession()
+
+    elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
+        -- open world: picking up a rare mid-fight starts its session
+        if UnitAffectingCombat("player") then maybeStartCombatSession() end
 
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- Combat ended. Close ANY active session — not just "combat"
@@ -559,26 +617,55 @@ local function OnEvent(_, event, ...)
            and not unit:find("^party")
            and not unit:find("^raid") then return end
         if not updateInfo then return end
-        if updateInfo.isFullUpdate then return end
-        if updateInfo.addedAuras then
+        -- 12.1: UNIT_AURA updateInfo.isFullUpdate is now a SECRET boolean while
+        -- our execution is tainted; a raw `if` test on it throws (this handler
+        -- spammed SessionRecorder.lua:562 x75 on patch day). Guard with
+        -- issecretvalue: skip full updates only when the flag is readable; when
+        -- secret, fall through -- addedAuras is nil on a full update, so the
+        -- block below no-ops anyway.
+        local isFullUpdate = updateInfo.isFullUpdate
+        if not (issecretvalue and issecretvalue(isFullUpdate)) and isFullUpdate then return end
+        -- 12.1: in instances the addedAuras LIST ITSELF is a secret table -- you
+        -- cannot ipairs() it ("table expected, got secret", SessionRecorder:577).
+        -- Only iterate a readable (non-instanced / secrets-off) list; when the
+        -- list is secret we skip this path -- instanced aura capture must come
+        -- from the periodic probe / ETEA, not the raw UNIT_AURA delta.
+        local addedAuras = updateInfo.addedAuras
+        if addedAuras and not (issecretvalue and issecretvalue(addedAuras)) then
             -- In a raid, helpful auras (HoTs, buffs, raid CDs) are
             -- VERY high volume. Skip them to keep the bucket focused
             -- on harmful auras (debuffs / mechanic landings), which
             -- is what we actually need for tank-swap detection and
             -- post-fight mechanic analysis.
             local in_raid = IsInRaid and IsInRaid()
-            for _, info in ipairs(updateInfo.addedAuras) do
-                if info.spellId
-                   and (not in_raid or info.isHarmful) then
+            for _, info in ipairs(addedAuras) do
+                -- 12.1: aura fields (spellId, isHarmful) can be SECRET in
+                -- instances under our taint; guard every boolean test / spellId
+                -- lookup with issecretvalue and OVER-CAPTURE (rather than taint)
+                -- when a value is unreadable. Raw secret values are still safe
+                -- to store in the table -- Core.lua tags them on serialize.
+                local spellId       = info.spellId
+                local isHarmful     = info.isHarmful
+                local spellIdSecret = issecretvalue and issecretvalue(spellId)
+                local harmfulSecret = issecretvalue and issecretvalue(isHarmful)
+                -- has a spellId? (secret = present-but-unreadable = keep). Never
+                -- compare a secret with ~= (that taints) -- short-circuit first.
+                local hasSpell = spellIdSecret or (spellId ~= nil)
+                -- in a raid keep only harmful auras; if harmfulness is secret,
+                -- keep it rather than branch on a secret bool.
+                local keep = (not in_raid) or harmfulSecret or isHarmful
+                if hasSpell and keep then
                     pushAura({
                         target_unit = unit,
-                        spell_id    = info.spellId,
+                        spell_id    = spellId,
                         spell_name  = info.name,
                         source_unit = info.sourceUnit,
                         is_helpful  = info.isHelpful,
-                        is_harmful  = info.isHarmful,
+                        is_harmful  = isHarmful,
                         duration    = info.duration,
-                        important   = tagSpellImportant(info.spellId),
+                        -- skip the tagSpellImportant lookup on a secret spellId
+                        -- (a secret table key would taint).
+                        important   = (not spellIdSecret) and tagSpellImportant(spellId) or false,
                     })
                 end
             end
@@ -586,6 +673,11 @@ local function OnEvent(_, event, ...)
 
     elseif event == "RAID_TARGET_UPDATE" then
         if current_session then pushEvent("marker_update", {}) end
+    elseif event == "PLAYER_LOGOUT" then
+        -- Logout / reload mid-fight: close the open session so it gets an
+        -- end_ts/end_gt and is queued. Otherwise it is saved without end_ts
+        -- and the login backfill below skips it forever.
+        if current_session then endSession(nil) end
     elseif event == "PLAYER_LOGIN" then
         -- Backfill drainer: any stored session that finished but never hit the
         -- upload queue (logout/disband/reload mid-fight skipped endSession) gets
@@ -618,6 +710,7 @@ for _, ev in ipairs({
     "ENCOUNTER_START", "ENCOUNTER_END",
     "CHALLENGE_MODE_START", "CHALLENGE_MODE_COMPLETED",
     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
+    "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
     "ENCOUNTER_TIMELINE_EVENT_ADDED",
     "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START",
     "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_CHANNEL_STOP",
@@ -625,7 +718,7 @@ for _, ev in ipairs({
     "UNIT_SPELLCAST_STOP",
     "UNIT_AURA",
     "RAID_TARGET_UPDATE",
-    "PLAYER_LOGIN",
+    "PLAYER_LOGIN", "PLAYER_LOGOUT",
 }) do
     frame:RegisterEvent(ev)
 end
