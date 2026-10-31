@@ -1,5 +1,13 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.11] — 2026-10-31
+
+### Fixed
+- A fight cut short by a boss pull, a logout or a /reload is now saved and uploaded (it was kept with no end time and skipped).
+- No longer closes the tooltip you're reading when an enemy starts casting.
+- Friendly casts are ignored.
+- `/vrtr` (and the minimap button) always opens the upload settings, so you can change your choice later.
+
 ## [1.0.10] — 2026-10-15
 
 ### Changed
