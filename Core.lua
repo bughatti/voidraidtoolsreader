@@ -1027,13 +1027,10 @@ local function onNameplateCast(unit)
         active_casts[unit] = nil
         local elapsed = GetTime() - start_ts
         detLog(unit, "POLY_FIRED", string.format("elapsed=%.2f", elapsed))
-        if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-            local name = MyName()
-            if name then
-                pcall(C_ChatInfo.SendAddonMessage, ADDON_PREFIX,
-                      "POLY_INCOMING|" .. unit, "WHISPER", name)
-            end
-        end
+        -- No POLY_INCOMING whisper any more (2026-11-01): VoidRaidTools drops it (Marker
+        -- Kick Alert replaced it), and the self-whisper by bare name ("Vede") resolved to a
+        -- same-named offline character on another realm -> "No player named
+        -- 'Vede-Elune' is currently playing" in chat. Logged locally only.
         local d = getDB()
         d.poly_alerts = d.poly_alerts or {}
         table.insert(d.poly_alerts, {

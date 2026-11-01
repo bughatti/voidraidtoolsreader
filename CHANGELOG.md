@@ -1,5 +1,10 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.12] — 2026-11-01
+
+### Fixed
+- **"No player named … is currently playing" in chat.** The addon sent itself a hidden message by your bare character name; when another character with the same name exists on a different realm, the game tried that one instead and printed the error. That message wasn't used any more, so it's gone.
+
 ## [1.0.11] — 2026-10-31
 
 ### Fixed
