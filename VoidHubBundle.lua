@@ -89,16 +89,20 @@ end
 ----------------------------------------------------------------------
 local function BuildPopup()
     if popupFrame then return popupFrame end
-    popupFrame = CreateFrame("Frame", "VoidHubPopup", Minimap)
+    -- Its own frame on UIParent, not the minimap's: a gathering HUD (VoidGather,
+    -- FarmHud) moves the minimap and fades it out, which took the popup with it.
+    popupFrame = CreateFrame("Frame", "VoidHubPopup", UIParent)
     popupFrame:SetSize(40, 40)
-    popupFrame:SetFrameStrata("MEDIUM")
-    popupFrame:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 12)
+    popupFrame:SetFrameStrata("HIGH")
     popupFrame:Hide()
+    popupFrame:EnableMouse(false)   -- only its icons take clicks (it's a ring, not a box)
     popupFrame:SetScript("OnShow", function(self)
-        self:EnableMouse(true)
         self:SetScript("OnEvent", function(_, event)
             if event == "GLOBAL_MOUSE_DOWN" then
-                if hubBtn and (hubBtn:IsMouseOver() or self:IsMouseOver()) then return end
+                if hubBtn and hubBtn:IsMouseOver() then return end
+                for _, it in ipairs(popupItems) do
+                    if it:IsShown() and it:IsMouseOver() then return end
+                end
                 self:Hide()
             end
         end)
@@ -127,7 +131,74 @@ local function RefreshPopup()
     end
     if popupItems._noneLabel then popupItems._noneLabel:Hide() end
 
-    popupFrame:SetSize(slotSize + 8, n * (slotSize + gap) - gap + 4)
+    -- Rings around the hub button: about 5 icons in the first ring, 8 in the next,
+    -- 11 after that (half rings). A full circle when it all fits on the screen,
+    -- else half rings opening toward the middle of the screen (the hub usually
+    -- sits on the minimap, in a corner).
+    popupFrame:SetSize(1, 1)
+    local positions = {}
+    do
+        local STEP, RSTEP, MARGIN = 34, 34, 18
+        local hb = hubBtn or Minimap
+        local uiScale = UIParent:GetEffectiveScale()
+        local hx, hy = hb:GetCenter()
+        local hs = hb:GetEffectiveScale() / uiScale
+        hx, hy = (hx or 0) * hs, (hy or 0) * hs
+        local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+        local function layout(span, a0)
+            local pts, left, ring = {}, n, 0
+            while left > 0 do
+                ring = ring + 1
+                -- across the 140-degree fan: 5 icons, then 7, 9, 12
+                local r = 56 + (ring - 1) * RSTEP
+                local cap = math.floor(span * r / STEP) + ((span >= 2 * math.pi - 0.01) and 0 or 1)
+                local m = math.min(left, math.max(cap, 1))
+                local gapA = (span >= 2 * math.pi - 0.01) and (2 * math.pi / m) or (cap > 1 and span / (cap - 1) or 0)
+                local startA = (span >= 2 * math.pi - 0.01) and (a0 + math.pi / 2) or (a0 - gapA * (m - 1) / 2)
+                for j = 0, m - 1 do
+                    local a = startA + gapA * j
+                    pts[#pts + 1] = { r * math.cos(a), r * math.sin(a) }
+                end
+                left = left - m
+            end
+            return pts
+        end
+        local function fits(pts)
+            for _, p in ipairs(pts) do
+                local x, y = hx + p[1], hy + p[2]
+                if x < MARGIN or x > sw - MARGIN or y < MARGIN or y > sh - MARGIN then return false end
+            end
+            return true
+        end
+        -- A fan opening outward from what the hub sits on (the minimap, or a HUD's
+        -- stand-in for it), through the hub, so the rings stay clear of the minimap
+        -- and of the other buttons on its rim; 140 degrees keeps the ends off them.
+        -- If that runs off the screen (a hub in a corner), a narrower fan toward
+        -- the screen's middle; whatever still sticks out is nudged back in.
+        local base = hb:GetParent()
+        local bx, by
+        -- (not `base and base:GetCenter()`: an `and` keeps only the first return)
+        if base and base.GetCenter then bx, by = base:GetCenter() end
+        local outward
+        if bx and by and base ~= UIParent then
+            local bs = base:GetEffectiveScale() / uiScale
+            outward = math.atan2(hy - by * bs, hx - bx * bs)
+        end
+        local toward = math.atan2(sh / 2 - hy, sw / 2 - hx)
+        positions = layout(math.rad(140), outward or toward)
+        if not fits(positions) then positions = layout(math.rad(140), toward) end
+        if not fits(positions) then positions = layout(math.pi / 2, toward) end
+        -- still off the screen: slide the whole fan in (keeps the spacing; nudging
+        -- icons one by one stacked them on top of each other in a corner)
+        local x0, x1, y0, y1 = math.huge, -math.huge, math.huge, -math.huge
+        for _, p in ipairs(positions) do
+            x0, x1 = math.min(x0, hx + p[1]), math.max(x1, hx + p[1])
+            y0, y1 = math.min(y0, hy + p[2]), math.max(y1, hy + p[2])
+        end
+        local dx = (x0 < MARGIN and MARGIN - x0) or (x1 > sw - MARGIN and sw - MARGIN - x1) or 0
+        local dy = (y0 < MARGIN and MARGIN - y0) or (y1 > sh - MARGIN and sh - MARGIN - y1) or 0
+        for _, p in ipairs(positions) do p[1], p[2] = p[1] + dx, p[2] + dy end
+    end
     for i, entry in ipairs(buttons) do
         local item = popupItems[i]
         if not item then
@@ -157,7 +228,7 @@ local function RefreshPopup()
             popupItems[i] = item
         end
         item:ClearAllPoints()
-        item:SetPoint("TOP", popupFrame, "TOP", 0, -(4 + (i - 1) * (slotSize + gap)))
+        item:SetPoint("CENTER", popupFrame, "CENTER", positions[i][1], positions[i][2])
         item._name, item._fullName, item._addonButton, item._launcher = entry.name, entry.fullName, entry.button, entry.launcher
         local srcTexture = entry.launcher and entry.launcher.icon
         if entry.button and entry.button.GetRegions then
@@ -188,13 +259,8 @@ local function TogglePopup()
     if popupFrame:IsShown() then popupFrame:Hide(); return end
     RefreshPopup()
     popupFrame:ClearAllPoints()
-    local screenW = GetScreenWidth() or 1920
-    local mapCenterX = Minimap:GetCenter() or (screenW / 2)
-    if mapCenterX > screenW / 2 then
-        popupFrame:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -8, 0)
-    else
-        popupFrame:SetPoint("TOPLEFT", Minimap, "TOPRIGHT", 8, 0)
-    end
+    -- centered on the hub button: its icons ring around it (RefreshPopup)
+    popupFrame:SetPoint("CENTER", hubBtn or Minimap, "CENTER")
     popupFrame:Show()
 end
 
