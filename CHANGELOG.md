@@ -1,5 +1,10 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.13] — 2026-11-01
+
+### Changed
+- **Void hub icon:** the list of Void addons is up to date (adds VoidGather and VoidSweep, refreshed descriptions).
+
 ## [1.0.12] — 2026-11-01
 
 ### Fixed
