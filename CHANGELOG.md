@@ -1,5 +1,13 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.15] — 2026-11-02
+
+### Changed
+- **Void hub:** right-click it for **Copy settings from...**: take another character's settings for your Void addons.
+
+### Fixed
+- **Void hub:** its position on your minimap is saved per character again, like in the other Void addons.
+
 ## [1.0.14] — 2026-11-02
 
 ### Changed

@@ -7,7 +7,7 @@
 -- next /reload triggers another addon to create it.
 --
 -- Left-click hub → vertical row of Void* minimap icons
--- Right-click hub → info panel about all Void* addons (cross-promotion)
+-- Right-click hub → info panel about all Void* addons (cross-promotion) + copy settings from another character
 --
 -- Position persistence: uses shared SavedVariablesPerCharacter VoidHubCharDB
 -- (each Void* addon's TOC must include this var name for persistence to
@@ -298,9 +298,68 @@ local function BuildInfoFrame()
     local close = CreateFrame("Button", nil, infoFrame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
 
+    -- Copy settings from another character: settings are per character in
+    -- every Void addon (CharSettings.lua), which sign up in VoidHubSettings.
+    local copyBtn = CreateFrame("Button", nil, infoFrame, "BackdropTemplate")
+    copyBtn:SetSize(180, 20)
+    copyBtn:SetPoint("TOP", 0, -34)
+    copyBtn:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+    copyBtn:SetBackdropColor(0.10, 0.12, 0.15, 1)
+    copyBtn:SetBackdropBorderColor(CYAN_R, CYAN_G, CYAN_B, 0.6)
+    local copyText = copyBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    copyText:SetPoint("CENTER")
+    copyText:SetText("Copy settings from...")
+    copyBtn:SetScript("OnClick", function(self)
+        if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+        local reg = _G.VoidHubSettings or {}
+        local byChar, addons = {}, {}
+        for addon, r in pairs(reg) do
+            addons[#addons + 1] = addon
+            for _, key in ipairs(r.characters()) do
+                byChar[key] = byChar[key] or {}
+                table.insert(byChar[key], addon)
+            end
+        end
+        local chars = {}
+        for key in pairs(byChar) do chars[#chars + 1] = key end
+        table.sort(chars)
+        MenuUtil.CreateContextMenu(self, function(_, root)
+            if root.SetScrollMode then root:SetScrollMode(400) end   -- many alts: scroll, don't run off screen
+            root:CreateTitle("Copy settings from")
+            if #chars == 0 then
+                root:CreateTitle("|cff8c8c9eNo other character yet: log one in first.|r")
+            end
+            for _, key in ipairs(chars) do
+                local list = byChar[key]
+                table.sort(list)
+                local sub = root:CreateButton(key)
+                sub:CreateButton(("|cff00c7ffAll Void addons (%d)|r"):format(#list), function()
+                    for _, addon in ipairs(list) do reg[addon].copyFrom(key) end
+                    ReloadUI()
+                end)
+                for _, addon in ipairs(list) do
+                    sub:CreateButton(addon, function()
+                        if reg[addon].copyFrom(key) then ReloadUI() end
+                    end)
+                end
+            end
+        end)
+    end)
+    copyBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(CYAN_R, CYAN_G, CYAN_B, 1)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine("Copy settings from another character", CYAN_R, CYAN_G, CYAN_B)
+        GameTooltip:AddLine("Each character keeps its own Void addon settings, and a new character starts with the last one you played. Pick a character to take its settings for all your Void addons or just one. A reload applies them.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    copyBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(CYAN_R, CYAN_G, CYAN_B, 0.6)
+        GameTooltip:Hide()
+    end)
+
     -- Scrollable list of addons
     local scroll = CreateFrame("ScrollFrame", nil, infoFrame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 14, -36)
+    scroll:SetPoint("TOPLEFT", 14, -62)
     scroll:SetPoint("BOTTOMRIGHT", -30, 14)
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(390, 1)
@@ -387,7 +446,7 @@ local function CreateHubButton()
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText("|cff00c7ffVoidHub|r")
         GameTooltip:AddLine("Left-click: open Void addons", 1, 1, 1)
-        GameTooltip:AddLine("Right-click: info on all Void addons", 1, 1, 1)
+        GameTooltip:AddLine("Right-click: all Void addons, copy settings from another character", 1, 1, 1)
         GameTooltip:AddLine("Drag: reposition", 0.7, 0.7, 0.7)
         local buttons = DiscoverVoidButtons()
         if #buttons > 0 then
