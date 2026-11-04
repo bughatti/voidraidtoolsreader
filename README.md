@@ -63,7 +63,7 @@ WoW addons can't make web requests, so uploads go through a small separate app, 
 - **Get it:** [voidscout.io/install](https://voidscout.io/install) or the [GitHub releases page](https://github.com/bughatti/voidscout-uploader/releases/latest)
 
 ### Playing by the rules
-Every API used is part of Blizzard's documented addon interface. The data is the same kind Warcraft Logs, Archon, WoWAnalyzer, and Details upload — we just run our own server. No anti-cheat bypassing, no restricted actions, and no reading other players' positions.
+Every API used is part of Blizzard's documented addon interface. The data is the same kind your own combat log records, and it goes to our own server. No anti-cheat bypassing, no restricted actions, and no reading other players' positions.
 
 ---
 

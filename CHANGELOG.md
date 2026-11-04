@@ -1,5 +1,10 @@
 # VoidRaidToolsReader Changelog
 
+## [1.0.16] — 2026-11-03
+
+### Changed
+- Clearer wording in the upload consent window and the README. No change to what is recorded or uploaded.
+
 ## [1.0.15] — 2026-11-02
 
 ### Changed
@@ -100,7 +105,7 @@
 - `/vrtr` slash for consent state + opt-out: `/vrtr optout` (local-only), `/vrtr optin` (allow uploads), `/vrtr` (show current state, open dialog if undecided).
 - `VRTReader_IsUploadAllowed()` public predicate that `SessionRecorder.queueForUpload` checks before pushing to `pending_uploads`. Local-only mode still records sessions to disk for `/vrtsr` inspection, just doesn't queue for upload.
 - `PLAYER_LOGIN` backfill drainer in `SessionRecorder`: any stored session that finished but never hit the upload queue (logout/disband/reload mid-fight skipped `endSession`) gets pushed in now, deduped by `session_id`.
-- README documenting exactly what's collected, what isn't, and the TOS posture (same data shape as Warcraft Logs / Archon / WoWAnalyzer combat-log uploads).
+- README documenting exactly what's collected, what isn't, and the TOS posture (the same kind of data your own combat log records).
 
 ## 1.0.0 — 2026-06
 

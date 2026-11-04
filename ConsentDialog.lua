@@ -76,7 +76,7 @@ local function BuildDialog()
         "Reader watches boss fights and can upload what it sees to |cffffd700api.voidscout.io|r so the community can score performance and analyze raid mechanics.\n\n" ..
         "|cffffd700What gets uploaded:|r boss cast events (ETEA), group composition (names/realms/classes/specs), friendly buff/debuff traces during pulls, encounter ID + difficulty + kill/wipe outcome.\n\n" ..
         "|cffffd700We do NOT upload:|r protected actions, gear / inventory, chat, system info, anything outside an active encounter.\n\n" ..
-        "All data is publicly visible to your client during play (same as Warcraft Logs, Archon, BigWigs)."
+        "All of this data is already visible to your game client during play."
     )
 
     -- Uploader requirement callout — the box that explains the gotcha that

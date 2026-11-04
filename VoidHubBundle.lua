@@ -50,7 +50,7 @@ local KNOWN_VOID_ADDONS = {
     { name = "VoidGear",       label = "Gear Planner",      public = true, desc = "What the top Mythic+ players of your spec wear, your upgrades, and where your crests should go." },
     { name = "VoidLFG",        label = "Group Finder",      desc = "Enhanced LFG dialog with party history and quality filters." },
     { name = "VoidPlates",     label = "Nameplates",        public = true, desc = "Clean, readable enemy nameplates: who is casting, what to kick and who it is aimed at." },
-    { name = "VoidProf",       label = "Professions",       desc = "Profession tracking, recipe finder, and crafting queue." },
+    { name = "VoidProf",       label = "Professions",       public = true, desc = "What to spend profession knowledge on, this week's knowledge sources, and the cheapest way to level from what your characters have." },
     { name = "VoidPug",        label = "Pug Tracker",       public = true, desc = "Track pug raid lockouts automatically, never lose contact with a good pug leader." },
     { name = "VoidQuest",      label = "Quests",            desc = "Quest helper with proximity sort and step-by-step guides." },
     { name = "VoidRaidTools",  label = "Raid Tools",        public = true, desc = "A complement to DBM and BigWigs that handles the parts they leave to you: kick rotation, tank swaps, boss helpers." },
